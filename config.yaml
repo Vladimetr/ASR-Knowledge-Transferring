@@ -1,0 +1,36 @@
+# mechanism (KT-RL-CIF)
+# https://arxiv.org/pdf/1905.11235.pdf
+# https://github.com/MingLunHan/CIF-PyTorch
+cif: &cif   
+  name: cif            # for defining corresponding class
+  threshold: 0.99      # beta in paper
+  quantity_loss: True  # see paper
+
+# mechanism (KT-RL-ATT)
+attention: &attention  # for defining corresponding class
+  name: attention
+  nheads: 4
+  dropout: 0.1
+  bias: True
+
+# LM
+bert: &bert
+  # see ./lm/bert/models/
+  name: bert
+  model: sberbank-ai/ruBert-base
+  tokenizer: sberbank-ai/ruBert-base
+
+
+# Learning method (KT-RL)
+representation: &representation
+  name: representation    # for defining corresponding class
+  in_dim: 768             # encoder out H
+  out_dim: 768            # E
+  mechanism: *attention
+  lm: *bert
+
+# Learning method
+# classification is not implemented yet
+
+learning: *representation
+# represenation or classification

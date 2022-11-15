@@ -91,7 +91,7 @@ class RepresentationLearning(nn.Module):
         lm_embeds *= mask
 
         # Loss computation
-        cos_loss = self.cos_sim(out_embeds, lm_embeds)
+        cos_loss = 1 - self.cos_sim(out_embeds, lm_embeds)
         # (B, )
         losses["cosine"] = cos_loss
         return losses

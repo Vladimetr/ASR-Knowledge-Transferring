@@ -1,6 +1,7 @@
 Knowledge Transferring (KT) module for train ASR
 ========================
-[**Paper**](https://arxiv.org/abs/2203.03582)<br/>
+This repository represents PyTorch implementation of 
+[**"Improving CTC-based speech recognition via knowledge transferring from pre-trained language models"**](https://arxiv.org/abs/2203.03582) <br/>
 
 Knowledge Transferring (KT) implies usage of Language Model (LM) 
 knowledge for train encoder (Wav2Vec). 

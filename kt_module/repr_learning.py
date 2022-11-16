@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from .lm import from_config
 
+
 class RepresentationLearning(nn.Module):
     """
     Knowledge Transfering Representation Learning module
@@ -57,11 +58,7 @@ class RepresentationLearning(nn.Module):
             target_sentences (list[str]): B-list of sentences
         Returns:
             dict with losses:
-                "cosine": tensor (B, )
-                    cosine similarity btwn 
-                    CIF outputs and LM embeds 
-                        (B, T): if reduction=None
-                        scalar: if reduction='mean'
+                "cosine": scalar
                 other losses (optionally)
 
         """    
@@ -89,9 +86,15 @@ class RepresentationLearning(nn.Module):
         mask = torch.unsqueeze(out_mask, -1).int()
         out_embeds *= mask
         lm_embeds *= mask
-
+        # (B, T, E)
+        
         # Loss computation
         cos_loss = 1 - self.cos_sim(out_embeds, lm_embeds)
-        # (B, )
-        losses["cosine"] = cos_loss
+        # take into account only unmasked values
+        cos_loss *= out_mask
+        # mean
+        cos_loss = torch.sum(cos_loss) / torch.sum(out_mask)
+        # scalar
+        losses["cosine"] = cos_loss.item()
+        
         return losses

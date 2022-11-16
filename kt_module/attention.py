@@ -54,6 +54,7 @@ class Attention(RLmechanism):
                             bias=bias
         )
         self.encoder_embed_dim = in_dim
+        self.nheads = nheads
         # for matching last dims
         if in_dim != out_dim:
             self.out_layer = nn.Linear(in_dim, 
@@ -84,20 +85,70 @@ class Attention(RLmechanism):
             target_mask[i, :cur_len] = 1.
         return target_mask
 
+    @staticmethod
+    def _combine_masks(mask1, mask2):
+        """
+        Args:
+            mask1 (B, S1) int or bool: [[1, 1, 1, 0, 0, 0, 0]]
+            mask2 (B, S2) int or bool: [[1, 1, 0, 0]]
+        Raises:
+            ValueError: "mask1 and mask2 must have save type"
+        Returns:
+            (B, S1, S2) int or bool: logical AND
+            [[[1, 1, 1, 0, 0, 0, 0],
+              [1, 1, 1, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0]]]
+        """
+        if mask1.dtype != mask2.dtype:
+            raise ValueError("mask1 and mask2 must have save type")
+        B, S1 = mask1.shape
+        _, S2 = mask2.shape
+
+        mask1 = torch.unsqueeze(mask1, 2)
+        # (B, S1, 1)
+        mask1 = mask1.expand(B, S1, S2)
+        # (B, S1, S2)
+
+        mask2 = torch.unsqueeze(mask2, 1)
+        # (B, 1, S2)
+        mask2 = mask2.expand(B, S1, S2)
+        # (B, S1, S2)
+
+
+        if mask1.dtype == torch.bool:
+            combined_mask = torch.logical_and(mask1, mask2)
+        else:
+            combined_mask = mask1 * mask2
+
+        return combined_mask
+
     def forward(self, encoder_outputs, encoder_mask, target_lengths):
         """
         see more description in parent class
         """
-        target_mask = self._mask_from_lengths(target_lengths).int()
-        target_mask_exp = torch.unsqueeze(target_mask, -1)  # expanded
-        # (B, T, 1)
-        empty_tensor = torch.zeros_like(target_mask_exp)
+        B, L, H = encoder_outputs.shape
+        T = target_lengths.max().item()
+        empty_tensor = torch.zeros(B, T, H)
         pos_embeds = self.pos_encoder(empty_tensor)
-        pos_embeds *= target_mask_exp
-        # (B, T, H) with mask applied (may be wrong!)
+        # (B, T, H)
 
-        # NOTE: In Multihead attention batch dim is second.
-        # In some PyTorch verions it's available to change it
+        # masks preparing
+        target_mask = self._mask_from_lengths(target_lengths)
+        encoder_mask = encoder_mask.bool()
+        # (B, T) bool - 0 is masked
+        # encoder_mask (B, L) bool - 0 is masked
+
+        # combine input and output masks -> attn mask
+        attn_mask = self._combine_masks(target_mask, encoder_mask)
+        # (B, T, L)
+        attn_mask = torch.unsqueeze(attn_mask, 1)  # (B, 1, T, L)
+        attn_mask = attn_mask.expand(-1, self.nheads, -1, -1)
+        attn_mask = attn_mask.reshape(B*self.nheads, T, L)
+        # (B*HEADS, T, L) transformer requires this format
+
+        # NOTE: In Multihead attention batch dim is second for Q, K, V.
+        # In some PyTorch versions it's available to change it
         # but in some versions it's not
         # (B, T, ) -> (L, T, )
         pos_embeds = torch.transpose(pos_embeds, 0, 1)
@@ -113,25 +164,35 @@ class Attention(RLmechanism):
             query=query,
             key=key,
             value=value,
-            key_padding_mask=1-encoder_mask.int(),
+            key_padding_mask=torch.logical_not(encoder_mask),
+            attn_mask=torch.logical_not(attn_mask),
             need_weights=False
         )
         # (T, B, H) -> (B, T, H)
         out = torch.transpose(attn_output, 0, 1)
-        
+
+        # check if masking is correct
+        assert torch.equal(
+            torch.logical_not(torch.isnan(out[:, :, 0])),
+            target_mask
+        )
+
         # (B, T, H) -> (B, T, E)
         if self.out_layer:
             out = self.out_layer(out)
 
+        # nan to 0.0
+        out[out != out] = 0.0
+
         # add losses
         losses = dict()  # no losses provided in this mechanism
 
-        return out, target_mask, losses
+        return out, target_mask.int(), losses
 
 
 
 if __name__ == '__main__':
-    att = Attention(512, 768)
+    att = Attention(512, 10)
     B, L = 3, 10
     H = 512
     encoder_outputs = torch.rand(B, L, H, dtype=torch.float32, requires_grad=True)
@@ -139,7 +200,6 @@ if __name__ == '__main__':
 
     target_lens = torch.tensor([2, 3, 4], dtype=torch.int)
 
-    out = att(encoder_outputs, mask, target_lens)
+    out, _, _ = att(encoder_outputs, mask, target_lens)
     print(out.shape)
-
-    
+    print(out)

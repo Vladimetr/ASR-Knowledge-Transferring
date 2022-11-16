@@ -89,8 +89,8 @@ class Attention(RLmechanism):
     def _combine_masks(mask1, mask2):
         """
         Args:
-            mask1 (B, S1) int or bool: [[1, 1, 1, 0, 0, 0, 0]]
-            mask2 (B, S2) int or bool: [[1, 1, 0, 0]]
+            mask1 (B, S1) int or bool: [[1, 1, 0, 0]]
+            mask2 (B, S2) int or bool: [[1, 1, 1, 0, 0, 0, 0]]
         Raises:
             ValueError: "mask1 and mask2 must have save type"
         Returns:

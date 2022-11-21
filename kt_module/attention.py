@@ -115,7 +115,6 @@ class Attention(RLmechanism):
         mask2 = mask2.expand(B, S1, S2)
         # (B, S1, S2)
 
-
         if mask1.dtype == torch.bool:
             combined_mask = torch.logical_and(mask1, mask2)
         else:

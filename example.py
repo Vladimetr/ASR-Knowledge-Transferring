@@ -22,5 +22,6 @@ assert B == len(target_sentences)
 losses = train_module(encoder_outputs, mask, target_sentences)
 # loss = ctc_loss + [weighted sum of these losses]
 # (see eq.4 and eq.7 in paper)
+print(losses)
 
 # loss.backward()

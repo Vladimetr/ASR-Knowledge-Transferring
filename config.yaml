@@ -3,8 +3,8 @@
 # https://github.com/MingLunHan/CIF-PyTorch
 cif: &cif   
   name: cif            # for defining corresponding class
-  threshold: 0.99      # beta in paper
-  quantity_loss: True  # see paper
+  threshold: 0.99      # beta in paper about CIF
+  quantity_loss: True  # see paper about CIF
 
 # mechanism (KT-RL-ATT)
 attention: &attention  # for defining corresponding class
@@ -15,22 +15,32 @@ attention: &attention  # for defining corresponding class
 
 # LM
 bert: &bert
-  # see ./lm/bert/models/
   name: bert
   model: sberbank-ai/ruBert-base
   tokenizer: sberbank-ai/ruBert-base
+
+# LM
+gpt2: &gpt2
+  name: gpt2
+  model: sberbank-ai/rugpt2large
+  tokenizer: sberbank-ai/rugpt2large
 
 
 # Learning method (KT-RL)
 representation: &representation
   name: representation    # for defining corresponding class
-  in_dim: 768             # encoder out H
-  out_dim: 768            # E
+  encoder_dim: 768        # encoder (Wav2Vec) out dim H
   mechanism: *attention
   lm: *bert
 
 # Learning method
-# classification is not implemented yet
+classification: &classification
+  name: classification    # for defining corresponding class
+  encoder_dim: 768        # encoder (Wav2Vec) out dim H
+  nheads: 4               # number of attention heads
+  dropout: 0.1
+  bias: True
+  lm: *gpt2
 
 learning: *representation
 # represenation or classification

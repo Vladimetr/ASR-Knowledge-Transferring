@@ -1,5 +1,43 @@
 import torch.nn as nn
 from abc import ABCMeta, abstractmethod
+from . import lm as language_model
+
+
+class KTModule(nn.Module, metaclass=ABCMeta):
+    """
+    Knowledge Transferring module for train ASR
+    https://arxiv.org/abs/2203.03582
+    """
+    def __init__(self, encoder_dim, lm:dict, *args, **kwargs):
+        """
+        in_dim (int): encoder output dim H
+        lm (dict): config for LM (see config.yaml)
+        """
+        super().__init__()
+        self.encoder_dim = encoder_dim
+        self.lm = language_model.from_config(lm)
+        self.lm_fdim = self.lm.get_fdim()           # E
+
+    def forward(self, encoder_outputs, encoder_mask, target_sentences):
+        """
+        Get losses for given batch
+        B - batch size
+        L - max len of elements
+        H - encoder output dim
+        E - output dim
+        Args:
+            encoder_outputs (B, L, H)
+            encoder_mask (B, L) int or bool: 0 is invalid
+            target_sentences (list[str]): B-list of sentences
+        Returns:
+            dict with losses:
+                "cosine": scalar
+                other losses (optionally)
+        """
+        assert encoder_outputs.shape[ :2] == encoder_mask.shape[ :2], \
+                "wrong sizes of 'encoder_outputs' or/and 'encoder_mask'"
+        assert encoder_outputs.shape[0] == len(target_sentences), \
+                "number of target sentences must be equal to B"
 
 
 class RLmechanism(nn.Module, metaclass=ABCMeta):
@@ -28,8 +66,8 @@ class RLmechanism(nn.Module, metaclass=ABCMeta):
         Args:
             encoder_outputs (B, L, H) float32: raw outputs 
                                                of acoustic encoder
-            mask (B, L) bool: padding mask of encoder outputs
-                              0 - is invalid items
+            encoder_mask (B, L) int or bool: padding mask of encoder outputs
+                                      0 - is invalid items
             target_lengths (B) int: length of targets
         Return:
             tuple

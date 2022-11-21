@@ -1,27 +1,22 @@
 import torch
 import torch.nn as nn
-from .lm import from_config
+from .utils import KTModule
 
 
-class RepresentationLearning(nn.Module):
+class RepresentationLearning(KTModule):
     """
-    Knowledge Transfering Representation Learning module
-    https://arxiv.org/pdf/2203.03582.pdf
+    KT - Representation Learning (RL) module
     """
     def __init__(self, 
-                in_dim,             # encoder out feature dim H
-                out_dim,            # out dim E
-                lm:dict,            # config (see config.yaml:bert)
-                mechanism:dict,     # config (see config.yaml:mechanism)
+                encoder_dim,        # encoder output dim H
+                lm:dict,            # config (see config.yaml)
+                mechanism:dict,     # config (see config.yaml)
         ):
-        super().__init__()
-        self._init_mechanism(in_dim, out_dim, mechanism)
-        self.lm = from_config(lm)
-        if out_dim != self.lm.get_fdim():
-            raise Exception("Mismatch feature dims")
+        super().__init__(encoder_dim=encoder_dim, lm=lm)
+        self._init_mechanism(self.encoder_dim, self.lm_fdim, mechanism)
         # Init Losses
         self.cos_sim = nn.CosineSimilarity(dim=-1)
-        # Only train mode is available
+        # Only train mode is available for RL
         self.train()
 
     def _init_mechanism(self, in_dim, out_dim, mechanism_cfg:dict):
@@ -43,7 +38,7 @@ class RepresentationLearning(nn.Module):
         self.mechanism.train()  # only train mode is available
 
     def eval(self):
-        raise NotImplementedError("Only train mode is available")
+        raise NotImplementedError("Only train mode is available for RL")
 
     def forward(self, encoder_outputs, encoder_mask, target_sentences):
         """
@@ -54,18 +49,20 @@ class RepresentationLearning(nn.Module):
         E - CIF out dim (equal to LM feature dim)
         Args:
             encoder_outputs (B, L, H)
-            encoder_mask (B, L) int: 0 is invalid
+            encoder_mask (B, L) int or bool: 0 is invalid
             target_sentences (list[str]): B-list of sentences
         Returns:
             dict with losses:
                 "cosine": scalar
                 other losses (optionally)
-
         """    
+        # check sizes
+        super().forward(encoder_outputs, encoder_mask, target_sentences)
+
         # LM is not trainable
         with torch.no_grad():
             lm_embeds, target_mask = self.lm.get_embeds(target_sentences)
-        # (B, T, E), (B, T)
+        # (B, T, E), (B, T) int
 
         # mechanism
         target_lengths = target_mask.sum(-1)
